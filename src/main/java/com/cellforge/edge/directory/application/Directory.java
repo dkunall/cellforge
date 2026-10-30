@@ -24,5 +24,9 @@ public interface Directory {
 
     void setStatus(UUID id, RouteStatus status);
 
+    /** ACTIVE to MOVING, atomically; false if the tenant is not ACTIVE (another move holds it, say). */
+    boolean beginMove(UUID id);
+
+    /** Points the tenant at its new cell and ends the move. */
     void moveTo(UUID id, String cellId);
 }

@@ -68,8 +68,13 @@ class JdbcDirectory implements Directory {
     }
 
     @Override
+    public boolean beginMove(UUID id) {
+        return jdbc.sql("UPDATE tenants SET status = 'MOVING' WHERE id = ? AND status = 'ACTIVE'").param(id).update() == 1;
+    }
+
+    @Override
     public void moveTo(UUID id, String cellId) {
-        jdbc.sql("UPDATE tenants SET cell_id = ? WHERE id = ?").params(cellId, id).update();
+        jdbc.sql("UPDATE tenants SET cell_id = ?, status = 'ACTIVE' WHERE id = ?").params(cellId, id).update();
     }
 
     private static TenantRoute map(ResultSet rs, int n) throws SQLException {

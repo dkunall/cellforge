@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
@@ -63,6 +65,39 @@ class HttpCellClient implements CellClient {
             return Optional.empty();
         } catch (RestClientException e) {
             throw new UpstreamUnavailableException("cell-unavailable", "Could not check membership in the cell");
+        }
+    }
+
+    @Override
+    public void transfer(String cellUrl, UUID tenantId, TransferStep step) {
+        HttpMethod method = step == TransferStep.PURGE ? HttpMethod.DELETE : HttpMethod.POST;
+        String path = step == TransferStep.PURGE ? "" : "/" + step.name().toLowerCase();
+        try {
+            http.method(method).uri(cellUrl + "/internal/tenants/{id}/transfer" + path, tenantId)
+                .headers(h -> h.setBearerAuth(tokens.token())).retrieve().toBodilessEntity();
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("cell-unavailable", "Transfer step " + step + " failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public Snapshot export(String cellUrl, UUID tenantId) {
+        try {
+            return http.get().uri(cellUrl + "/internal/tenants/{id}/transfer", tenantId)
+                .headers(h -> h.setBearerAuth(tokens.token())).retrieve().body(Snapshot.class);
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("cell-unavailable", "Export failed: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public Map<String, TableDigest> restore(String cellUrl, UUID tenantId, Map<String, String> tables) {
+        try {
+            return http.put().uri(cellUrl + "/internal/tenants/{id}/transfer", tenantId)
+                .headers(h -> h.setBearerAuth(tokens.token())).body(Map.of("tables", tables)).retrieve()
+                .body(new ParameterizedTypeReference<Map<String, TableDigest>>() { });
+        } catch (RestClientException e) {
+            throw new UpstreamUnavailableException("cell-unavailable", "Restore failed: " + e.getMessage());
         }
     }
 }
