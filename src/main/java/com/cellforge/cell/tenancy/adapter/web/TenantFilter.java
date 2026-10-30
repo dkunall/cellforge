@@ -99,9 +99,10 @@ class TenantFilter extends OncePerRequestFilter {
             return;
         }
         Entitlements plan = entitlements.forTenant(tenantId);
-        int limit = plan.maxConcurrentRequests();
+        TenantBulkhead.Permit permit;
         try {
-            if (!bulkhead.tryEnter(tenantId, limit, BULKHEAD_WAIT)) {
+            permit = bulkhead.tryEnter(tenantId, plan.maxConcurrentRequests(), BULKHEAD_WAIT).orElse(null);
+            if (permit == null) {
                 response.setHeader("Retry-After", "1");
                 ProblemWriter.write(response, json, HttpStatus.TOO_MANY_REQUESTS, "tenant-busy",
                     "Too many requests in flight for this workspace");
@@ -111,7 +112,7 @@ class TenantFilter extends OncePerRequestFilter {
             Thread.currentThread().interrupt();
             throw new ServletException(e);
         }
-        try {
+        try (permit) {
             Scope scope = probe.withMember(found.member().orElse(null), plan.statementTimeout());
             TenantContext.call(scope, () -> {
                 try {
@@ -126,8 +127,6 @@ class TenantFilter extends OncePerRequestFilter {
                 throw io;
             }
             throw (ServletException) e.getCause();
-        } finally {
-            bulkhead.leave(tenantId, limit);
         }
     }
 
