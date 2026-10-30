@@ -82,7 +82,7 @@ public class TaskService {
             }
         }
         Project project = projects.lockForChange(projectId).orElseThrow(() -> ProjectService.notFound(projectId));
-        ProjectAccess.checkWrite(actor, project, false, Permission.TASK_WRITE);
+        ProjectAccess.checkWrite(actor, project, guestOn(actor, project), Permission.TASK_WRITE);
         if (cmd.assigneeId() != null) {
             checkAssignable(cmd.assigneeId());
         }
