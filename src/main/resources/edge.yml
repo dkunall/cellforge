@@ -62,3 +62,9 @@ cellforge:
     uri: ${CELLFORGE_TOKEN_URI:http://localhost:7891/cellforge/token}
     client-id: ${CELLFORGE_CLIENT_ID:cellforge-edge}
     client-secret: ${CELLFORGE_CLIENT_SECRET}
+  payments:
+    # Shared with the payment provider; the edge rejects webhooks it cannot verify with it.
+    webhook-secret: ${CELLFORGE_WEBHOOK_SECRET}
+  billing:
+    sweep: ${CELLFORGE_BILLING_SWEEP:true}
+    sweep-interval: PT1M

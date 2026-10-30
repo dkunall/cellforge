@@ -110,6 +110,8 @@ public final class Platform {
             .post("/v1/invites", Map.of("email", userId + "@example.test", "role", role)).expect(201).text("token");
     }
 
+    public static final String WEBHOOK_SECRET = UUID.randomUUID().toString();
+
     public record Workspace(UUID id, String slug, String cellId, String ownerId) {
     }
 
@@ -131,6 +133,9 @@ public final class Platform {
         properties.put("spring.kafka.bootstrap-servers", Containers.kafka().getBootstrapServers());
         properties.put("spring.security.oauth2.resourceserver.jwt.issuer-uri", "http://test-issuer/cellforge");
         properties.put("cellforge.service-token.client-secret", "unused");
+        properties.put("cellforge.payments.webhook-secret", WEBHOOK_SECRET);
+        // Tests run the billing sweep themselves after moving the clock.
+        properties.put("cellforge.billing.sweep", "false");
         properties.put("spring.main.banner-mode", "off");
         properties.put("logging.level.root", "WARN");
         String serviceToken = TestJwt.service(client, "cellforge.internal");
