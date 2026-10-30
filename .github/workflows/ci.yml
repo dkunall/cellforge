@@ -40,7 +40,7 @@ jobs:
     timeout-minutes: 30
     env:
       # up.sh writes fresh secrets here; the file stays on the runner and is never printed.
-      CELLFORGE_ENV_FILE: ${{ runner.temp }}/cellforge.env
+      CELLFORGE_ENV_FILE: /tmp/cellforge-ci.env
     steps:
       - uses: actions/checkout@v7
       - name: Build image
