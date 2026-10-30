@@ -61,6 +61,11 @@ class JdbcMembers implements Members {
         return jdbc.sql("SELECT count(*) FROM memberships WHERE role = ?").param(role.name()).query(Long.class).single();
     }
 
+    @Override
+    public void lockSeats() {
+        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended('seats:' || current_tenant()::text, 0))").query().singleRow();
+    }
+
     private static Member map(ResultSet rs, int n) throws SQLException {
         return new Member(rs.getObject("tenant_id", UUID.class), rs.getString("user_id"), rs.getString("email"),
             rs.getString("display_name"), Role.valueOf(rs.getString("role")), rs.getTimestamp("joined_at").toInstant());

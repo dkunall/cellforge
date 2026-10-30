@@ -20,4 +20,7 @@ public interface Members {
     long seats();
 
     long countByRole(Role role);
+
+    /** Serialises seat-changing transactions of the current tenant until commit. */
+    void lockSeats();
 }

@@ -40,6 +40,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 class TenantFilter extends OncePerRequestFilter {
 
     static final String TENANT_HEADER = "X-Tenant-Id";
+    /** The one call a non-member may make: accepting an invite, which is what makes them a member. */
+    private static final String ACCEPT_PATH = "/v1/invites/accept";
     private static final Duration LOOKUP_TIMEOUT = Duration.ofSeconds(2);
     private static final Duration BULKHEAD_WAIT = Duration.ofMillis(250);
 
@@ -91,7 +93,8 @@ class TenantFilter extends OncePerRequestFilter {
                 "Tenant is not hosted on this cell");
             return;
         }
-        if (found.member().isEmpty()) {
+        boolean accepting = "POST".equals(request.getMethod()) && ACCEPT_PATH.equals(request.getRequestURI());
+        if (found.member().isEmpty() && !accepting) {
             ProblemWriter.write(response, json, HttpStatus.FORBIDDEN, "not-a-member", "You are not a member of this workspace");
             return;
         }
@@ -109,7 +112,7 @@ class TenantFilter extends OncePerRequestFilter {
             throw new ServletException(e);
         }
         try {
-            Scope scope = probe.withMember(found.member().get(), plan.statementTimeout());
+            Scope scope = probe.withMember(found.member().orElse(null), plan.statementTimeout());
             TenantContext.call(scope, () -> {
                 try {
                     chain.doFilter(request, response);
