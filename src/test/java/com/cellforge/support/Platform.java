@@ -99,6 +99,17 @@ public final class Platform {
         return new Workspace(UUID.fromString(created.text("id")), slug, cell, ownerId);
     }
 
+    /** Invites {@code userId} with {@code role} as the owner and accepts as them. */
+    public void join(Workspace w, String userId, String role) {
+        String token = invite(w, userId, role);
+        edge().as(TestJwt.user(userId)).in(w.slug()).post("/v1/invites/accept", Map.of("token", token)).expect(200);
+    }
+
+    public String invite(Workspace w, String userId, String role) {
+        return edge().as(TestJwt.user(w.ownerId())).in(w.slug())
+            .post("/v1/invites", Map.of("email", userId + "@example.test", "role", role)).expect(201).text("token");
+    }
+
     public record Workspace(UUID id, String slug, String cellId, String ownerId) {
     }
 
