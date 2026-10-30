@@ -62,3 +62,7 @@ cellforge:
     timeout: 2s
   entitlements:
     cache-ttl: 60s
+  service-token:
+    uri: ${CELLFORGE_TOKEN_URI:http://localhost:7891/cellforge/token}
+    client-id: ${CELLFORGE_CLIENT_ID:cellforge-cell}
+    client-secret: ${CELLFORGE_CLIENT_SECRET}
