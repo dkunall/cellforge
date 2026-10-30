@@ -124,7 +124,7 @@ and timed-out requests carry `Retry-After`.
 mvn verify        # needs Docker for Testcontainers; about 4 minutes on my machine
 ```
 
-- **Unit (41):** rank generation (jqwik properties), membership rules, role permissions, pricing (proration,
+- **Unit (46):** rank generation (jqwik properties), membership rules, role permissions, pricing (proration,
   graduated API tiers), webhook signatures, mention parsing, the per-tenant bulkhead, metering dedupe and hourly buckets,
   and 7 ArchUnit rules.
 - **Integration (50, Testcontainers):** one Postgres per cell plus the directory database, Redis, Kafka and
