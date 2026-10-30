@@ -1,0 +1,64 @@
+spring:
+  application:
+    name: cellforge-cell
+  threads:
+    virtual:
+      enabled: true
+  autoconfigure:
+    # Rate limits and quotas live at the edge; cells never talk to Redis.
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.redis.RedisRepositoriesAutoConfiguration
+  datasource:
+    url: ${CELL_DB_URL:jdbc:postgresql://localhost:5432/cell}
+    # The runtime role: owns nothing, cannot bypass row-level security.
+    username: ${CELL_DB_APP_USER:cellforge_app}
+    password: ${CELL_DB_APP_PASSWORD}
+    hikari:
+      maximum-pool-size: ${CELL_DB_POOL:16}
+      connection-timeout: 3000
+      connection-init-sql: SET lock_timeout = '3s'
+  flyway:
+    locations: classpath:db/cell
+    # Migrations run as the owner; the app role is created by V1 with the password below.
+    user: ${CELL_DB_OWNER_USER:cellforge}
+    password: ${CELL_DB_OWNER_PASSWORD}
+    placeholders:
+      appUser: ${spring.datasource.username}
+      appPassword: ${spring.datasource.password}
+  kafka:
+    bootstrap-servers: ${CELLFORGE_KAFKA_BOOTSTRAP:localhost:9092}
+    consumer:
+      auto-offset-reset: latest
+      enable-auto-commit: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${CELLFORGE_JWT_ISSUER:http://localhost:7891/cellforge}
+
+server:
+  port: ${PORT:8080}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      cell: ${cellforge.cell.id}
+
+cellforge:
+  cell:
+    id: ${CELL_ID:cell-a}
+  edge:
+    url: ${EDGE_INTERNAL_URL:http://localhost:7890}
+    timeout: 2s
+  entitlements:
+    cache-ttl: 60s
