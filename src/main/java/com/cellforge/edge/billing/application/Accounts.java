@@ -30,13 +30,15 @@ public class Accounts implements TenantLifecycle {
     private final Plans plans;
     private final Subscriptions subscriptions;
     private final Clock clock;
+    private final EntitlementEvents events;
     private final Cache<UUID, Standing> standings = Caffeine.newBuilder()
         .maximumSize(100_000).expireAfterWrite(Duration.ofSeconds(30)).build();
 
-    public Accounts(Plans plans, Subscriptions subscriptions, Clock clock) {
+    public Accounts(Plans plans, Subscriptions subscriptions, Clock clock, EntitlementEvents events) {
         this.plans = plans;
         this.subscriptions = subscriptions;
         this.clock = clock;
+        this.events = events;
     }
 
     @Override
@@ -57,7 +59,14 @@ public class Accounts implements TenantLifecycle {
         });
     }
 
+    /** Drops this replica's copy only; used when another replica announced the change. */
     public void forget(UUID tenantId) {
         standings.invalidate(tenantId);
+    }
+
+    /** Call after committing a plan or status change. */
+    public void changed(UUID tenantId) {
+        forget(tenantId);
+        events.changed(tenantId);
     }
 }
