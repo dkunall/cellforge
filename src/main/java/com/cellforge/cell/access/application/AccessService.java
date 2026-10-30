@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
@@ -60,6 +61,17 @@ public class AccessService {
     public List<Member> members() {
         TenantContext.member();
         return members.all();
+    }
+
+    /** For the edge's billing: what the tenant is charged for. Runs in an internal scope, not as a member. */
+    @Transactional(readOnly = true)
+    public long seatsInUse() {
+        return members.seats();
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Role> roleOf(String userId) {
+        return members.find(userId).map(Member::role);
     }
 
     @Transactional
