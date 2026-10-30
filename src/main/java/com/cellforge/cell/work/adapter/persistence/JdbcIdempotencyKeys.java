@@ -26,7 +26,7 @@ class JdbcIdempotencyKeys implements IdempotencyKeys {
         if (inserted == 1) {
             return Optional.empty();
         }
-        return jdbc.sql("SELECT request_hash, status, body::text AS body FROM idempotency_keys "
+        return jdbc.sql("SELECT request_hash, status, body #>> '{}' AS body FROM idempotency_keys "
                 + "WHERE tenant_id = current_tenant() AND user_id = ? AND key = ?")
             .params(userId, key)
             .query((rs, n) -> new Stored(rs.getString("request_hash"), (Integer) rs.getObject("status"),
@@ -36,7 +36,7 @@ class JdbcIdempotencyKeys implements IdempotencyKeys {
 
     @Override
     public void complete(String userId, String key, int status, String body) {
-        jdbc.sql("UPDATE idempotency_keys SET status = ?, body = ?::jsonb "
+        jdbc.sql("UPDATE idempotency_keys SET status = ?, body = to_jsonb(?::text) "
                 + "WHERE tenant_id = current_tenant() AND user_id = ? AND key = ?")
             .params(status, body, userId, key).update();
     }
