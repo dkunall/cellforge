@@ -1,0 +1,136 @@
+name: cellforge
+
+# Secrets come from an env file that scripts/up.sh generates outside the repo; nothing here has a default.
+x-secrets: &secrets
+  CELLFORGE_CLIENT_SECRET: ${CELLFORGE_CLIENT_SECRET:?run scripts/up.sh or set CELLFORGE_CLIENT_SECRET}
+  CELLFORGE_JWT_ISSUER: http://oauth:8080/cellforge
+  CELLFORGE_TOKEN_URI: http://oauth:8080/cellforge/token
+  CELLFORGE_KAFKA_BOOTSTRAP: kafka:9092
+
+x-postgres: &postgres
+  image: postgres:16-alpine
+  healthcheck:
+    test: ["CMD-SHELL", "pg_isready -U cellforge"]
+    interval: 3s
+    retries: 30
+
+services:
+  directory-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: directory
+      POSTGRES_USER: cellforge
+      POSTGRES_PASSWORD: ${EDGE_DB_PASSWORD:?set EDGE_DB_PASSWORD}
+
+  cell-a-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: cell
+      POSTGRES_USER: cellforge
+      POSTGRES_PASSWORD: ${CELL_DB_OWNER_PASSWORD:?set CELL_DB_OWNER_PASSWORD}
+
+  cell-b-db:
+    <<: *postgres
+    environment:
+      POSTGRES_DB: cell
+      POSTGRES_USER: cellforge
+      POSTGRES_PASSWORD: ${CELL_DB_OWNER_PASSWORD:?set CELL_DB_OWNER_PASSWORD}
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+
+  kafka:
+    image: apache/kafka:3.8.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_HEAP_OPTS: -Xmx256m -Xms256m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  # Issues a token to any client_id; the requested scope decides what the token may do.
+  oauth:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    environment:
+      SERVER_PORT: 8080
+      JSON_CONFIG: |
+        {"interactiveLogin": false, "tokenCallbacks": [{"issuerId": "cellforge", "tokenExpiry": 3600, "requestMappings": [
+            {"requestParam": "scope", "match": "cellforge.user", "claims": {"sub": "$${clientId}", "email": "$${clientId}@example.test", "scope": "cellforge.user"}},
+            {"requestParam": "scope", "match": "cellforge.internal", "claims": {"sub": "$${clientId}", "scope": "cellforge.internal"}},
+            {"requestParam": "scope", "match": "cellforge.admin", "claims": {"sub": "$${clientId}", "scope": "cellforge.admin"}}
+        ]}]}
+    ports:
+      - "127.0.0.1:7891:8080"
+
+  cell-a:
+    image: cellforge:local
+    depends_on:
+      cell-a-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      oauth: { condition: service_started }
+    environment:
+      <<: *secrets
+      CELLFORGE_ROLE: cell
+      CELL_ID: cell-a
+      CELL_DB_URL: jdbc:postgresql://cell-a-db:5432/cell
+      CELL_DB_OWNER_PASSWORD: ${CELL_DB_OWNER_PASSWORD}
+      CELL_DB_APP_PASSWORD: ${CELL_DB_APP_PASSWORD:?set CELL_DB_APP_PASSWORD}
+      EDGE_INTERNAL_URL: http://edge:7890
+      JAVA_TOOL_OPTIONS: -Xmx320m -XX:+ExitOnOutOfMemoryError
+
+  cell-b:
+    image: cellforge:local
+    depends_on:
+      cell-b-db: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      oauth: { condition: service_started }
+    environment:
+      <<: *secrets
+      CELLFORGE_ROLE: cell
+      CELL_ID: cell-b
+      CELL_DB_URL: jdbc:postgresql://cell-b-db:5432/cell
+      CELL_DB_OWNER_PASSWORD: ${CELL_DB_OWNER_PASSWORD}
+      CELL_DB_APP_PASSWORD: ${CELL_DB_APP_PASSWORD:?set CELL_DB_APP_PASSWORD}
+      EDGE_INTERNAL_URL: http://edge:7890
+      JAVA_TOOL_OPTIONS: -Xmx320m -XX:+ExitOnOutOfMemoryError
+
+  edge:
+    build: .
+    image: cellforge:local
+    depends_on:
+      directory-db: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      kafka: { condition: service_healthy }
+      oauth: { condition: service_started }
+      cell-a: { condition: service_healthy }
+      cell-b: { condition: service_healthy }
+    environment:
+      <<: *secrets
+      CELLFORGE_ROLE: edge
+      PORT: 7890
+      EDGE_DB_URL: jdbc:postgresql://directory-db:5432/directory
+      EDGE_DB_PASSWORD: ${EDGE_DB_PASSWORD}
+      CELLFORGE_REDIS_HOST: redis
+      CELL_A_URL: http://cell-a:8080
+      CELL_B_URL: http://cell-b:8080
+      CELLFORGE_WEBHOOK_SECRET: ${CELLFORGE_WEBHOOK_SECRET:?set CELLFORGE_WEBHOOK_SECRET}
+      JAVA_TOOL_OPTIONS: -Xmx384m -XX:+ExitOnOutOfMemoryError
+    ports:
+      - "127.0.0.1:7890:7890"
