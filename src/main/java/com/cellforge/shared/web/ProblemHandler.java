@@ -6,8 +6,10 @@ import com.cellforge.shared.error.ForbiddenException;
 import com.cellforge.shared.error.InvalidRequestException;
 import com.cellforge.shared.error.NotFoundException;
 import com.cellforge.shared.error.NotHostedException;
+import com.cellforge.shared.error.PaymentRequiredException;
 import com.cellforge.shared.error.PreconditionFailedException;
 import com.cellforge.shared.error.PreconditionRequiredException;
+import com.cellforge.shared.error.RateLimitedException;
 import com.cellforge.shared.error.StateConflictException;
 import com.cellforge.shared.error.UnavailableException;
 import com.cellforge.shared.error.UpstreamUnavailableException;
@@ -53,11 +55,16 @@ public class ProblemHandler extends ResponseEntityExceptionHandler {
             case UpstreamUnavailableException ignored -> HttpStatus.BAD_GATEWAY;
             case UnavailableException ignored -> HttpStatus.SERVICE_UNAVAILABLE;
             case NotHostedException ignored -> MISDIRECTED;
+            case PaymentRequiredException ignored -> HttpStatus.PAYMENT_REQUIRED;
+            case RateLimitedException ignored -> HttpStatus.TOO_MANY_REQUESTS;
             default -> HttpStatus.BAD_REQUEST;
         };
         ResponseEntity.BodyBuilder response = ResponseEntity.status(status);
         if (e instanceof UnavailableException u) {
             response.header(HttpHeaders.RETRY_AFTER, Integer.toString(u.retryAfterSeconds()));
+        }
+        if (e instanceof RateLimitedException r) {
+            response.header(HttpHeaders.RETRY_AFTER, Integer.toString(r.retryAfterSeconds()));
         }
         ProblemDetail body = problem(status, e.code(), e.getMessage());
         e.details().forEach(body::setProperty);
