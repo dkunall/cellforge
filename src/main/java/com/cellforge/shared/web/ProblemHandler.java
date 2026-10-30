@@ -7,6 +7,7 @@ import com.cellforge.shared.error.InvalidRequestException;
 import com.cellforge.shared.error.NotFoundException;
 import com.cellforge.shared.error.NotHostedException;
 import com.cellforge.shared.error.PreconditionFailedException;
+import com.cellforge.shared.error.PreconditionRequiredException;
 import com.cellforge.shared.error.StateConflictException;
 import com.cellforge.shared.error.UnavailableException;
 import com.cellforge.shared.error.UpstreamUnavailableException;
@@ -47,6 +48,7 @@ public class ProblemHandler extends ResponseEntityExceptionHandler {
             case StateConflictException ignored -> HttpStatus.CONFLICT;
             case BusinessRuleException ignored -> HttpStatus.UNPROCESSABLE_ENTITY;
             case PreconditionFailedException ignored -> HttpStatus.PRECONDITION_FAILED;
+            case PreconditionRequiredException ignored -> HttpStatus.PRECONDITION_REQUIRED;
             case InvalidRequestException ignored -> HttpStatus.BAD_REQUEST;
             case UpstreamUnavailableException ignored -> HttpStatus.BAD_GATEWAY;
             case UnavailableException ignored -> HttpStatus.SERVICE_UNAVAILABLE;
